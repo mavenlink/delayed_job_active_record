@@ -5,7 +5,7 @@ module Delayed
   module Backend
     module ActiveRecord
       class Configuration
-        attr_accessor :reserve_sql_strategy
+        attr_reader :reserve_sql_strategy
         cattr_accessor :redlock_instance
 
         def initialize
@@ -15,15 +15,19 @@ module Delayed
         def self.redlock
           self.redlock_instance ||= Redlock::Client.new([Redis.current])
         end
+
+        def reserve_sql_strategy=(val)
+          raise ArgumentError, "allowed values are :optimized_sql or :default_sql" unless val == :optimized_sql || val == :default_sql
+          @reserve_sql_strategy = val
+        end
       end
 
-      class << self
-        attr_accessor :configuration
+      def self.configuration
+        @configuration ||= Configuration.new
+      end
 
-        def configure
-          self.configuration ||= Configuration.new
-          yield(configuration)
-        end
+      def self.configure
+        yield(configuration)
       end
 
       # A job object that is persisted to the database.
@@ -198,5 +202,3 @@ module Delayed
     end
   end
 end
-
-Delayed::Backend::ActiveRecord.configuration = Delayed::Backend::ActiveRecord::Configuration.new
