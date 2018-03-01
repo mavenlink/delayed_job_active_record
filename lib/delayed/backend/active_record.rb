@@ -17,7 +17,7 @@ module Delayed
         end
 
         def reserve_sql_strategy=(val)
-          raise ArgumentError, "allowed values are :optimized_sql or :default_sql" unless val == :optimized_sql || val == :default_sql
+          raise ArgumentError, "allowed values are :optimized_sql, :default_sql, :racerpeter_sql, or :redis_sql_alt" unless val == :optimized_sql || val == :default_sql || val == :racerpeter_sql || val == :redis_sql_alt
           @reserve_sql_strategy = val
         end
       end

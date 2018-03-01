@@ -16,6 +16,16 @@ describe Delayed::Backend::ActiveRecord::Job do
         expect(Delayed::Backend::ActiveRecord.configuration.reserve_sql_strategy).to eq(:default_sql)
       end
 
+      it "allows :racerpeter_sql" do
+        Delayed::Backend::ActiveRecord.configuration.reserve_sql_strategy = :racerpeter_sql
+        expect(Delayed::Backend::ActiveRecord.configuration.reserve_sql_strategy).to eq(:racerpeter_sql)
+      end
+
+      it "allows :redis_sql_alt" do
+        Delayed::Backend::ActiveRecord.configuration.reserve_sql_strategy = :redis_sql_alt
+        expect(Delayed::Backend::ActiveRecord.configuration.reserve_sql_strategy).to eq(:redis_sql_alt)
+      end
+
       it "raises an argument error on invalid entry" do
         expect { Delayed::Backend::ActiveRecord.configuration.reserve_sql_strategy = :invald }.to raise_error(ArgumentError)
       end
