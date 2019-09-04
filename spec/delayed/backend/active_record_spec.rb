@@ -157,9 +157,8 @@ describe Delayed::Backend::ActiveRecord::Job do
       end
 
       it "raises an error" do
-        expect {
-          Delayed::Backend::ActiveRecord::Job.reserve_with_scope(scope, worker, Time.now)
-        }.to raise_error(RuntimeError)
+        expect { Delayed::Backend::ActiveRecord::Job.reserve_with_scope(scope, worker, Time.current) }
+          .to raise_error(RuntimeError)
       end
     end
   end
@@ -213,7 +212,7 @@ describe Delayed::Backend::ActiveRecord::Job do
   end
 
   if ::ActiveRecord::VERSION::MAJOR < 4 || defined?(::ActiveRecord::MassAssignmentSecurity)
-    it 'allows mass assignment' do
+    it "allows mass assignment" do
       expect(Delayed::Backend::ActiveRecord::Job.accessible_attributes).to include(
         :priority,
         :run_at,

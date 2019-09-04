@@ -15,9 +15,10 @@ module Delayed
         end
 
         def reserve_sql_strategy=(val)
-          if [:optimized_sql, :default_sql, :racerpeter_sql, :redis_sql_alt].exclude?(val)
+          if %i[optimized_sql default_sql racerpeter_sql redis_sql_alt].exclude?(val)
             raise ArgumentError, "allowed values are :optimized_sql, :default_sql, :racerpeter_sql, or :redis_sql_alt"
           end
+
           @reserve_sql_strategy = val
         end
 
@@ -182,21 +183,17 @@ module Delayed
             count == 1 && where(id: job_id)
           end
 
-          if the_job_id
-            where(id: the_job_id).first
-          end
+          where(id: the_job_id).first if the_job_id
         end
 
         def self.reserve_with_scope_using_redis_sql_alt(ready_scope, worker, now)
           # Use redis for locking
           the_return = nil
 
-          Delayed::Backend::ActiveRecord.configuration.class.redlock.lock("delayed_job", 10000) do |locked|
+          Delayed::Backend::ActiveRecord.configuration.class.redlock.lock("delayed_job", 10_000) do |locked|
             if locked
               first_ready_job = ready_scope.first
-              if first_ready_job && first_ready_job.update(locked_at: now, locked_by: worker.name)
-                the_return = first_ready_job
-              end
+              the_return = first_ready_job if first_ready_job&.update(locked_at: now, locked_by: worker.name)
             end
           end
 
@@ -227,4 +224,3 @@ module Delayed
     end
   end
 end
-
