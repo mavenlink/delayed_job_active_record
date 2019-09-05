@@ -193,7 +193,9 @@ module Delayed
           Delayed::Backend::ActiveRecord.configuration.class.redlock.lock("delayed_job", 10_000) do |locked|
             if locked
               first_ready_job = ready_scope.first
-              the_return = first_ready_job if first_ready_job&.update(locked_at: now, locked_by: worker.name)
+              if first_ready_job && first_ready_job.update(locked_at: now, locked_by: worker.name)
+                the_return = first_ready_job
+              end
             end
           end
 
