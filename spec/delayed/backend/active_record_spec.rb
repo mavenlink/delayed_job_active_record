@@ -46,9 +46,9 @@ describe Delayed::Backend::ActiveRecord::Job do
     let(:where) { instance_double(relation_class, update_all: 0) }
     let(:select) { instance_double(relation_class, to_sql: '') }
 
-    let(:pluck) { instance_double(relation_class, detect: detect) }
+    let(:pluck) { instance_double(Array, detect: detect) }
     let(:lock) { instance_double(relation_class, select: select) }
-    let(:limit) { instance_double(relation_class, update_all: 0, lock: lock, to_sql: '', pluck: pluck, detect: detect) }
+    let(:limit) { instance_double(relation_class, update_all: 0, lock: lock, to_sql: '', pluck: pluck) }
     let(:scope) { instance_double(relation_class, limit: limit, where: where, first: job) }
     let(:reserve_sql_strategy) { :optimized_sql }
 
