@@ -126,7 +126,7 @@ describe Delayed::Backend::ActiveRecord::Job do
       let(:reserve_sql_strategy) { :default_sql }
 
       it "uses the plain sql version" do
-        allow(Delayed::Backend::ActiveRecord::Job).to receive(:reserve_with_scope_using_default_sql).and_call_original
+        allow(Delayed::Backend::ActiveRecord::Job).to receive(:reserve_with_scope_using_default_sql)
         Delayed::Backend::ActiveRecord::Job.reserve_with_scope(scope, worker, Time.current)
         expect(Delayed::Backend::ActiveRecord::Job).to have_received(:reserve_with_scope_using_default_sql).once
       end
