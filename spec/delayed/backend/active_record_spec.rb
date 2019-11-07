@@ -40,15 +40,18 @@ describe Delayed::Backend::ActiveRecord::Job do
     let(:relation_class) { Delayed::Job.limit(1).class }
     let(:worker) { instance_double(Delayed::Worker, name: "worker01", read_ahead: 1) }
     let(:job_id) { 1 }
+    let(:sql) { "" }
     let(:job) { instance_double(Delayed::Job, id: job_id, update: true) }
 
     let(:detect) { -> { yield job_id } }
     let(:where) { instance_double(relation_class, update_all: 0) }
-    let(:select) { instance_double(relation_class, to_sql: '') }
+    let(:select) { instance_double(relation_class, to_sql: sql) }
 
     let(:pluck) { instance_double(Array, detect: detect) }
     let(:lock) { instance_double(relation_class, select: select) }
-    let(:limit) { instance_double(relation_class, update_all: 0, lock: lock, to_sql: '', pluck: pluck, detect: detect) }
+    let(:limit) do
+      instance_double(relation_class, update_all: 0, lock: lock, to_sql: sql, pluck: pluck, detect: detect)
+    end
     let(:scope) { instance_double(relation_class, limit: limit, where: where, first: job) }
     let(:reserve_sql_strategy) { :optimized_sql }
 
@@ -137,7 +140,9 @@ describe Delayed::Backend::ActiveRecord::Job do
       let(:reserve_sql_strategy) { :racerpeter_sql }
 
       it "uses the racerpeter sql version" do
-        allow(Delayed::Backend::ActiveRecord::Job).to receive(:reserve_with_scope_using_racerpeter_sql).and_call_original
+        allow(
+          Delayed::Backend::ActiveRecord::Job
+        ).to receive(:reserve_with_scope_using_racerpeter_sql).and_call_original
         Delayed::Backend::ActiveRecord::Job.reserve_with_scope(scope, worker, Time.current)
         expect(Delayed::Backend::ActiveRecord::Job).to have_received(:reserve_with_scope_using_racerpeter_sql).once
       end
