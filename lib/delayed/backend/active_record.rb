@@ -1,22 +1,29 @@
 # frozen_string_literal: true
 
 require "active_record/version"
+require "redlock"
+
 module Delayed
   module Backend
     module ActiveRecord
       class Configuration
         attr_reader :reserve_sql_strategy
+        cattr_accessor :redlock_instance
 
         def initialize
           self.reserve_sql_strategy = :optimized_sql
         end
 
         def reserve_sql_strategy=(val)
-          if !(val == :optimized_sql || val == :default_sql)
-            raise ArgumentError, "allowed values are :optimized_sql or :default_sql"
+          if %i[optimized_sql default_sql racerpeter_sql redis_sql_alt default_without_priority_sql].exclude?(val)
+            raise ArgumentError, "allowed values are :optimized_sql, :default_sql, :racerpeter_sql, or :redis_sql_alt, or :default_without_priority_sql"
           end
 
           @reserve_sql_strategy = val
+        end
+
+        def self.redlock
+          self.redlock_instance ||= Redlock::Client.new([Redis.current])
         end
       end
 
@@ -75,12 +82,19 @@ module Delayed
         end
 
         def self.reserve(worker, max_run_time = Worker.max_run_time)
-          ready_scope =
-            ready_to_run(worker.name, max_run_time)
-            .min_priority
-            .max_priority
-            .for_queues
-            .by_priority
+          ready_scope = begin
+            case Delayed::Backend::ActiveRecord.configuration.reserve_sql_strategy
+            when :default_without_priority_sql
+              ready_to_run(worker.name, max_run_time)
+              .for_queues
+            else
+              ready_to_run(worker.name, max_run_time)
+              .min_priority
+              .max_priority
+              .for_queues
+              .by_priority
+            end
+          end
 
           reserve_with_scope(ready_scope, worker, db_time_now)
         end
@@ -92,8 +106,14 @@ module Delayed
             reserve_with_scope_using_optimized_sql(ready_scope, worker, now)
           # Slower but in some cases more unproblematic strategy to lookup records
           # See https://github.com/collectiveidea/delayed_job_active_record/pull/89 for more details.
-          when :default_sql
+          when :default_sql, :default_without_priority_sql
             reserve_with_scope_using_default_sql(ready_scope, worker, now)
+          when :racerpeter_sql
+            reserve_with_scope_using_racerpeter_sql(ready_scope, worker, now)
+          when :redis_sql_alt
+            reserve_with_scope_using_redis_sql_alt(ready_scope, worker, now)
+          else
+            raise "Invalid value for 'reserve_sql_strategy' configuration option"
           end
         end
 
@@ -163,6 +183,32 @@ module Delayed
           where(locked_at: now, locked_by: worker.name, failed_at: nil).first
         end
 
+        def self.reserve_with_scope_using_racerpeter_sql(ready_scope, worker, now)
+          # Old fashioned with a twist
+          the_job_id = ready_scope.limit(worker.read_ahead).pluck(:id).detect do |job_id|
+            count = ready_scope.where(id: job_id).update_all(locked_at: now, locked_by: worker.name)
+            count == 1 && where(id: job_id)
+          end
+
+          where(id: the_job_id).first if the_job_id
+        end
+
+        def self.reserve_with_scope_using_redis_sql_alt(ready_scope, worker, now)
+          # Use redis for locking
+          the_return = nil
+
+          Delayed::Backend::ActiveRecord.configuration.class.redlock.lock("delayed_job", 10_000) do |locked|
+            if locked
+              first_ready_job = ready_scope.first
+              if first_ready_job && first_ready_job.update(locked_at: now, locked_by: worker.name)
+                the_return = first_ready_job
+              end
+            end
+          end
+
+          the_return
+        end
+
         # Get the current time (GMT or local depending on DB)
         # Note: This does not ping the DB to get the time, so all your clients
         # must have syncronized clocks.
@@ -180,6 +226,9 @@ module Delayed
           reset
           super
         end
+      end
+
+      class NoNewrelicSamplerJob < Job
       end
     end
   end

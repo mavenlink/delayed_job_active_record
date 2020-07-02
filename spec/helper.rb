@@ -26,6 +26,7 @@ require "delayed_job_active_record"
 require "delayed/backend/shared_spec"
 
 Delayed::Worker.logger = Logger.new("/tmp/dj.log")
+
 ENV["RAILS_ENV"] = "test"
 
 db_adapter = ENV["ADAPTER"]
