@@ -15,8 +15,8 @@ module Delayed
         end
 
         def reserve_sql_strategy=(val)
-          if %i[optimized_sql default_sql racerpeter_sql redis_sql_alt].exclude?(val)
-            raise ArgumentError, "allowed values are :optimized_sql, :default_sql, :racerpeter_sql, or :redis_sql_alt"
+          if %i[optimized_sql default_sql racerpeter_sql redis_sql_alt default_without_priority_sql].exclude?(val)
+            raise ArgumentError, "allowed values are :optimized_sql, :default_sql, :racerpeter_sql, or :redis_sql_alt, or :default_without_priority_sql"
           end
 
           @reserve_sql_strategy = val
@@ -82,12 +82,19 @@ module Delayed
         end
 
         def self.reserve(worker, max_run_time = Worker.max_run_time)
-          ready_scope =
-            ready_to_run(worker.name, max_run_time)
-            .min_priority
-            .max_priority
-            .for_queues
-            .by_priority
+          ready_scope = begin
+            case Delayed::Backend::ActiveRecord.configuration.reserve_sql_strategy
+            when :default_without_priority_sql
+              ready_to_run(worker.name, max_run_time)
+              .for_queues
+            else
+              ready_to_run(worker.name, max_run_time)
+              .min_priority
+              .max_priority
+              .for_queues
+              .by_priority
+            end
+          end
 
           reserve_with_scope(ready_scope, worker, db_time_now)
         end
@@ -99,7 +106,7 @@ module Delayed
             reserve_with_scope_using_optimized_sql(ready_scope, worker, now)
           # Slower but in some cases more unproblematic strategy to lookup records
           # See https://github.com/collectiveidea/delayed_job_active_record/pull/89 for more details.
-          when :default_sql
+          when :default_sql, :default_without_priority_sql
             reserve_with_scope_using_default_sql(ready_scope, worker, now)
           when :racerpeter_sql
             reserve_with_scope_using_racerpeter_sql(ready_scope, worker, now)
